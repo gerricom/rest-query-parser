@@ -243,14 +243,17 @@ func TestWhere(t *testing.T) {
 		{url: "?id[eq]=1&id[eq]=4", expected: " WHERE id = ? AND id = ?"},
 		{url: "?id[gte]=1&id[lte]=4", expected: " WHERE id >= ? AND id <= ?", expected2: " WHERE id <= ? AND id >= ?"},
 		{url: "?id[gte]=1|id[lte]=4", expected: " WHERE (id >= ? OR id <= ?)", expected2: " WHERE (id <= ? OR id >= ?)"},
-		// null:
-		{url: "?u[not]=NULL", expected: " WHERE u IS NOT NULL"},
-		{url: "?u[is]=NULL", expected: " WHERE u IS NULL"},
 		// bool:
 		{url: "?b=true", expected: " WHERE b = ?"},
 		{url: "?b=true1", err: "b: bad format"},
 		{url: "?b[not]=true", err: "b[not]: method are not allowed"},
 		{url: "?b[eq]=true,false", err: "b[eq]: method are not allowed"},
+		// string null:
+		{url: "?u[not]=NULL", expected: " WHERE (u IS NOT NULL AND u IS NOT '')"},
+		{url: "?u[is]=NULL", expected: " WHERE (u IS NULL OR u IS '')"},
+		// integer null:
+		{url: "?id[not]=NULL", expected: " WHERE id IS NOT NULL"},
+		{url: "?id[is]=NULL", expected: " WHERE id IS NULL"},
 	}
 	for _, c := range cases {
 		t.Run(c.url, func(t *testing.T) {
