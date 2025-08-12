@@ -17,11 +17,12 @@ const (
 
 // Filter represents a filter defined in the query part of URL
 type Filter struct {
-	Key    string // key from URL (eg. "id[eq]")
-	Name   string // name of filter, takes from Key (eg. "id")
-	Method Method // compare method, takes from Key (eg. EQ)
-	Value  interface{}
-	OR     StateOR
+	Key       string // key from URL (eg. "id[eq]")
+	Name      string // name of filter, takes from Key (eg. "id")
+	Method    Method // compare method, takes from Key (eg. EQ)
+	Value     interface{}
+	ValueType string // type of Value, can be "int", "bool" or "string"
+	OR        StateOR
 }
 
 // detectValidation
@@ -93,6 +94,7 @@ func newFilter(rawKey string, value string, delimiter string, validations Valida
 
 	// detect type by key names in validations
 	valueType := detectType(f.Name, validations)
+	f.ValueType = valueType
 
 	if err := f.parseValue(valueType, value, delimiter); err != nil {
 		return nil, err
@@ -125,6 +127,10 @@ func (f *Filter) validate(validate ValidationFunc) error {
 			}
 		}
 	case int, bool, string:
+		// Skip validation for NULL values as they are handled specially
+		if f.Value == NULL {
+			return nil
+		}
 		err := validate(f.Value)
 		if err != nil {
 			return err
@@ -135,7 +141,8 @@ func (f *Filter) validate(validate ValidationFunc) error {
 }
 
 // parseKey parses key to set f.Name and f.Method
-//   id[eq] -> f.Name = "id", f.Method = EQ
+//
+//	id[eq] -> f.Name = "id", f.Method = EQ
 func (f *Filter) parseKey(key string) error {
 
 	// default Method is EQ
@@ -206,7 +213,16 @@ func (f *Filter) Where() (string, error) {
 		return exp, nil
 	case IS, NOT:
 		if f.Value == NULL {
-			exp = fmt.Sprintf("%s %s NULL", f.Name, translateMethods[f.Method])
+			if f.ValueType != "string" {
+				exp = fmt.Sprintf("%s %s NULL", f.Name, translateMethods[f.Method])
+			} else {
+				connector := "OR"
+				if f.Method == NOT {
+					connector = "AND"
+				}
+
+				exp = fmt.Sprintf("(%s %s NULL %s %s %s '')", f.Name, translateMethods[f.Method], connector, f.Name, translateMethods[f.Method])
+			}
 			return exp, nil
 		}
 		return exp, ErrUnknownMethod
@@ -266,6 +282,11 @@ func (f *Filter) setInt(list []string) error {
 				return ErrBadFormat
 			}
 			f.Value = i
+		case IS, NOT:
+			if strings.Compare(strings.ToUpper(list[0]), NULL) == 0 {
+				f.Value = NULL
+				return nil
+			}
 		default:
 			return ErrMethodNotAllowed
 		}
