@@ -833,10 +833,8 @@ func (q *Query) parseSort(value []string, validate ValidationFunc) error {
 			desc = false
 		}
 
-		if validate != nil {
-			if err := validate(by); err != nil {
-				return err
-			}
+		if err := validate(by); err != nil {
+			return err
 		}
 
 		sort = append(sort, Sort{
@@ -866,11 +864,9 @@ func (q *Query) parseFields(value []string, validate ValidationFunc) error {
 
 	list = cleanSliceString(list)
 
-	if validate != nil {
-		for _, v := range list {
-			if err := validate(v); err != nil {
-				return err
-			}
+	for _, v := range list {
+		if err := validate(v); err != nil {
+			return err
 		}
 	}
 
