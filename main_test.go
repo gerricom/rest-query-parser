@@ -217,7 +217,7 @@ func TestWhere(t *testing.T) {
 		{url: "?id[nin]=1.2,1.2", expected: "", err: "id[nin]: bad format"},
 		{url: "?id[test]=1", expected: "", err: "id[test]: unknown method"},
 		{url: "?id[like]=1", expected: "", err: "id[like]: method are not allowed"},
-		{url: "?id=1,2", expected: "", err: "id: method are not allowed"},
+		{url: "?id=1,2", expected: "", err: "id: bad format"},
 		{url: "?id=4", expected: " WHERE id = ?"},
 
 		{url: "?id=100", err: "id: can't be greater then 10"},
@@ -237,7 +237,7 @@ func TestWhere(t *testing.T) {
 		{url: "?s[nin]=super,best", expected: " WHERE s NOT IN (?, ?)"},
 		{url: "?s=puper", expected: "", err: "s: puper: not in scope"},
 		{url: "?u=puper", expected: " WHERE u = ?"},
-		{url: "?u[eq]=1,2", expected: "", err: "u[eq]: method are not allowed"},
+		{url: "?u[eq]=1,2", expected: " WHERE u = ?"},
 		{url: "?u[gt]=1", expected: " WHERE u > ?"},
 		{url: "?id[in]=1,2", expected: " WHERE id IN (?, ?)"},
 		{url: "?id[eq]=1&id[eq]=4", expected: " WHERE id = ? AND id = ?"},
@@ -247,7 +247,7 @@ func TestWhere(t *testing.T) {
 		{url: "?b=true", expected: " WHERE b = ?"},
 		{url: "?b=true1", err: "b: bad format"},
 		{url: "?b[not]=true", err: "b[not]: method are not allowed"},
-		{url: "?b[eq]=true,false", err: "b[eq]: method are not allowed"},
+		{url: "?b[eq]=true,false", err: "b[eq]: bad format"},
 		// string null:
 		{url: "?u[not]=NULL", expected: " WHERE (u IS NOT NULL AND u IS NOT '')"},
 		{url: "?u[is]=NULL", expected: " WHERE (u IS NULL OR u IS '')"},
