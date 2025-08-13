@@ -246,14 +246,35 @@ func TestWhere(t *testing.T) {
 		// bool:
 		{url: "?b=true", expected: " WHERE b = ?"},
 		{url: "?b=true1", err: "b: bad format"},
-		{url: "?b[not]=true", err: "b[not]: method are not allowed"},
+		{url: "?b[not]=true", err: "b[not]: bad format"},
 		{url: "?b[eq]=true,false", err: "b[eq]: bad format"},
 		// string null:
-		{url: "?u[not]=NULL", expected: " WHERE (u IS NOT NULL AND u IS NOT '')"},
-		{url: "?u[is]=NULL", expected: " WHERE (u IS NULL OR u IS '')"},
+		{url: "?u[not]=NULL", expected: " WHERE u IS NOT NULL"},
+		{url: "?u[is]=NULL", expected: " WHERE u IS NULL"},
+		// string empty:
+		{url: "?u[not]=EMPTY", expected: " WHERE u IS NOT ''"},
+		{url: "?u[is]=EMPTY", expected: " WHERE u IS ''"},
+		// string null or empty:
+		{url: "?u[not]=NULLOREMPTY", expected: " WHERE (u IS NOT NULL AND u IS NOT '')"},
+		{url: "?u[is]=NULLOREMPTY", expected: " WHERE (u IS NULL OR u IS '')"},
 		// integer null:
 		{url: "?id[not]=NULL", expected: " WHERE id IS NOT NULL"},
 		{url: "?id[is]=NULL", expected: " WHERE id IS NULL"},
+		// integer empty:
+		{url: "?id[not]=EMPTY", expected: " WHERE id IS NOT NULL"},
+		{url: "?id[is]=EMPTY", expected: " WHERE id IS NULL"},
+		// integer null or empty:
+		{url: "?id[not]=NULLOREMPTY", expected: " WHERE id IS NOT NULL"},
+		{url: "?id[is]=NULLOREMPTY", expected: " WHERE id IS NULL"},
+		// bool null:
+		{url: "?b[not]=NULL", expected: " WHERE b IS NOT NULL"},
+		{url: "?b[is]=NULL", expected: " WHERE b IS NULL"},
+		// bool empty:
+		{url: "?b[not]=EMPTY", expected: " WHERE b IS NOT NULL"},
+		{url: "?b[is]=EMPTY", expected: " WHERE b IS NULL"},
+		// bool null or empty:
+		{url: "?b[not]=NULLOREMPTY", expected: " WHERE b IS NOT NULL"},
+		{url: "?b[is]=NULLOREMPTY", expected: " WHERE b IS NULL"},
 	}
 	for _, c := range cases {
 		t.Run(c.url, func(t *testing.T) {

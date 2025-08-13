@@ -128,7 +128,7 @@ func (f *Filter) validate(validate ValidationFunc) error {
 		}
 	case int, bool, string:
 		// Skip validation for NULL values as they are handled specially
-		if f.Value == NULL {
+		if IsNullOrEmpty(f.Value) {
 			return nil
 		}
 		err := validate(f.Value)
@@ -212,20 +212,38 @@ func (f *Filter) Where() (string, error) {
 		exp = fmt.Sprintf("%s %s ?", f.Name, translateMethods[f.Method])
 		return exp, nil
 	case IS, NOT:
-		if f.Value == NULL {
-			if f.ValueType != "string" {
-				exp = fmt.Sprintf("%s %s NULL", f.Name, translateMethods[f.Method])
-			} else {
-				connector := "OR"
-				if f.Method == NOT {
-					connector = "AND"
-				}
-
-				exp = fmt.Sprintf("(%s %s NULL %s %s %s '')", f.Name, translateMethods[f.Method], connector, f.Name, translateMethods[f.Method])
-			}
-			return exp, nil
+		if !IsNullOrEmpty(f.Value) {
+			return exp, ErrUnknownMethod
 		}
+
+		// Handling for anything else than strings
+		if f.ValueType != "string" {
+			if f.Value == EMPTY {
+				// bools and int's can not be empty
+				return exp, ErrUnknownMethod
+			}
+			return fmt.Sprintf("%s %s NULL", f.Name, translateMethods[f.Method]), nil
+		}
+
+		if f.Value == NULL {
+			return fmt.Sprintf("%s %s NULL", f.Name, translateMethods[f.Method]), nil
+		}
+
+		if f.Value == EMPTY {
+			return fmt.Sprintf("%s %s ''", f.Name, translateMethods[f.Method]), nil
+		}
+
+		if f.Value == NULLOREMPTY {
+			connector := "OR"
+			if f.Method == NOT {
+				connector = "AND"
+			}
+
+			return fmt.Sprintf("(%s %s NULL %s %s %s '')", f.Name, translateMethods[f.Method], connector, f.Name, translateMethods[f.Method]), nil
+		}
+
 		return exp, ErrUnknownMethod
+
 	case IN, NIN:
 		exp = fmt.Sprintf("%s %s (?)", f.Name, translateMethods[f.Method])
 		exp, _, _ = in(exp, f.Value)
@@ -247,7 +265,7 @@ func (f *Filter) Args() ([]interface{}, error) {
 		args = append(args, f.Value)
 		return args, nil
 	case IS, NOT:
-		if f.Value == NULL {
+		if IsNullOrEmpty(f.Value) {
 			args = append(args, f.Value)
 			return args, nil
 		}
@@ -283,10 +301,12 @@ func (f *Filter) setInt(list []string) error {
 			}
 			f.Value = i
 		case IS, NOT:
-			if strings.Compare(strings.ToUpper(list[0]), NULL) == 0 {
+			if IsNullOrEmpty(strings.ToUpper(list[0])) {
+				// We do handle all variants as null
 				f.Value = NULL
 				return nil
 			}
+			return ErrBadFormat
 		default:
 			return ErrMethodNotAllowed
 		}
@@ -309,6 +329,14 @@ func (f *Filter) setInt(list []string) error {
 
 func (f *Filter) setBool(list []string) error {
 	if len(list) == 1 {
+		if f.Method == IS || f.Method == NOT {
+			if IsNullOrEmpty(strings.ToUpper(list[0])) {
+				// We do handle all variants as null
+				f.Value = NULL
+				return nil
+			}
+			return ErrBadFormat
+		}
 		if f.Method != EQ {
 			return ErrMethodNotAllowed
 		}
@@ -331,10 +359,21 @@ func (f *Filter) setString(list []string) error {
 			f.Value = list[0]
 			return nil
 		case IS, NOT:
-			if strings.Compare(strings.ToUpper(list[0]), NULL) == 0 {
-				f.Value = NULL
+			v := strings.ToUpper(list[0])
+			if IsNullOrEmpty(v) {
+				switch v {
+				case NULL:
+					f.Value = NULL
+				case EMPTY:
+					f.Value = EMPTY
+				case NULLOREMPTY:
+					f.Value = NULLOREMPTY
+				default:
+					f.Value = NULL
+				}
 				return nil
 			}
+			return ErrBadFormat
 		default:
 			return ErrMethodNotAllowed
 		}

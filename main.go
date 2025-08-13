@@ -51,6 +51,12 @@ var (
 
 // NULL constant
 const NULL = "NULL"
+const EMPTY = "EMPTY"
+const NULLOREMPTY = "NULLOREMPTY"
+
+func IsNullOrEmpty(s interface{}) bool {
+	return s == NULL || s == EMPTY || s == NULLOREMPTY
+}
 
 var (
 	translateMethods map[Method]string = map[Method]string{
@@ -102,7 +108,6 @@ func (q *Query) SetDelimiterOR(d string) *Query {
 // When "fields" empty or not provided: `*`.
 //
 // When "fields=id,email": `id, email`.
-//
 func (q *Query) FieldsString() string {
 	if len(q.Fields) == 0 {
 		return "*"
@@ -117,7 +122,6 @@ func (q *Query) FieldsString() string {
 // When "fields" empty or not provided: `*`
 //
 // When "fields=id,email": `id, email`
-//
 func (q *Query) Select() string {
 	if len(q.Fields) == 0 {
 		return "*"
@@ -133,7 +137,6 @@ func (q *Query) Select() string {
 // When "fields" empty or not provided: `SELECT *`.
 //
 // When "fields=id,email": `SELECT id, email`.
-//
 func (q *Query) SELECT() string {
 	if len(q.Fields) == 0 {
 		return "SELECT *"
@@ -155,7 +158,6 @@ func (q *Query) AddField(field string) *Query {
 // OFFSET returns word OFFSET with number
 //
 // Return example: ` OFFSET 0`
-//
 func (q *Query) OFFSET() string {
 	if q.Offset > 0 {
 		return fmt.Sprintf(" OFFSET %d", q.Offset)
@@ -166,7 +168,6 @@ func (q *Query) OFFSET() string {
 // LIMIT returns word LIMIT with number
 //
 // Return example: ` LIMIT 100`
-//
 func (q *Query) LIMIT() string {
 	if q.Limit > 0 {
 		return fmt.Sprintf(" LIMIT %d", q.Limit)
@@ -455,9 +456,10 @@ type Replacer map[string]string
 // Parameter is a map[string]string which means map[currentName]newName.
 // The library provide beautiful way by using special type rqp.Replacer.
 // Example:
-//   rqp.ReplaceNames(rqp.Replacer{
-//	   "user_id": "users.user_id",
-//   })
+//
+//	  rqp.ReplaceNames(rqp.Replacer{
+//		   "user_id": "users.user_id",
+//	  })
 func (q *Query) ReplaceNames(r Replacer) {
 
 	for name, newname := range r {
@@ -526,7 +528,6 @@ func (q *Query) Where() string {
 // WHERE returns list of filters for WHERE SQL statement with `WHERE` word
 //
 // Return example: ` WHERE id > 0 AND email LIKE 'some@email.com'`
-//
 func (q *Query) WHERE() string {
 
 	if len(q.Filters) == 0 {
@@ -547,7 +548,7 @@ func (q *Query) Args() []interface{} {
 
 	for i := 0; i < len(q.Filters); i++ {
 		filter := q.Filters[i]
-		if (filter.Method == IS || filter.Method == NOT) && filter.Value == NULL {
+		if (filter.Method == IS || filter.Method == NOT) && IsNullOrEmpty(filter.Value) {
 			continue
 		}
 
