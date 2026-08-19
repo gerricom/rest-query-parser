@@ -21,7 +21,7 @@ type Filter struct {
 	Name      string // name of filter, takes from Key (eg. "id")
 	Method    Method // compare method, takes from Key (eg. EQ)
 	Value     interface{}
-	ValueType string // type of Value, can be "int", "bool" or "string"
+	ValueType string // type of Value, can be "int", "bool", "date" or "string"
 	OR        StateOR
 }
 
@@ -56,6 +56,8 @@ func detectType(name string, validations Validations) string {
 					return "int"
 				case "bool", "b":
 					return "bool"
+				case "date":
+					return "date"
 				default:
 					return "string"
 				}
@@ -193,6 +195,11 @@ func (f *Filter) parseValue(valueType string, value string, delimiter string) er
 		if err != nil {
 			return err
 		}
+	case "date":
+		err := f.setDate(list)
+		if err != nil {
+			return err
+		}
 	default: // str, string and all other unknown types will handle as string
 		err := f.setString(list)
 		if err != nil {
@@ -216,8 +223,8 @@ func (f *Filter) Where() (string, error) {
 			return exp, ErrUnknownMethod
 		}
 
-		// Handling for anything else than strings
-		if f.ValueType != "string" {
+		// Handling for anything else than text types
+		if f.ValueType != "string" && f.ValueType != "date" {
 			if f.Value == EMPTY {
 				// bools and int's can not be empty
 				return exp, ErrUnknownMethod
@@ -349,6 +356,45 @@ func (f *Filter) setBool(list []string) error {
 	} else {
 		return ErrMethodNotAllowed
 	}
+	return nil
+}
+
+func (f *Filter) setDate(list []string) error {
+	if len(list) == 1 {
+		switch f.Method {
+		case EQ, NE, GT, LT, GTE, LTE, IN, NIN:
+			date, err := ParseDate(list[0])
+			if err != nil {
+				return err
+			}
+			f.Value = date.Format(DateLayout)
+			return nil
+		case IS, NOT:
+			v := strings.ToUpper(list[0])
+			if IsNullOrEmpty(v) {
+				f.Value = v
+				return nil
+			}
+			return ErrBadFormat
+		default:
+			return ErrMethodNotAllowed
+		}
+	}
+
+	if f.Method != IN && f.Method != NIN {
+		return ErrMethodNotAllowed
+	}
+
+	dates := make([]string, len(list))
+	for i, v := range list {
+		date, err := ParseDate(v)
+		if err != nil {
+			return err
+		}
+		dates[i] = date.Format(DateLayout)
+	}
+	f.Value = dates
+
 	return nil
 }
 

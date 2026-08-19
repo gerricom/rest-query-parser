@@ -75,36 +75,61 @@ See cmd/main.go and tests for more examples.
 * `:required` - parameter is required. Must present in the query string. Raise error if not.
 * `:int` - parameter must be convertable to int type. Raise error if not.
 * `:bool` - parameter must be convertable to bool type. Raise error if not.
+* `:date` - parameter must be a date. Absolute (`2006-01-02`) and relative (`-90d`) values are accepted. Raise error if not.
 
 ## Supported types
 - `string` - the default type for all provided filters if not specified another. Could be compared by `eq, ne, gt, lt, gte, lte, like, ilike, nlike, nilike, in, nin, is, not` methods (`nlike, nilike` means `NOT LIKE, NOT ILIKE` respectively, `in, nin` means `IN, NOT IN` respectively, `is, not` for comparison to NULL `IS NULL, IS NOT NULL`).
 - `int` - integer type. Must be specified with tag ":int". Could be compared by `eq, ne, gt, lt, gte, lte, in, nin, is, not` methods.
 - `bool` - boolean type. Must be specified with tag ":bool". Could be compared by `eq` method.
+- `date` - date type. Must be specified with tag ":date". Could be compared by `eq, ne, gt, lt, gte, lte, in, nin, is, not` methods. See "Date usage".
 
 ## Date usage
-This is simple example to show logic which you can extend.
+Filters tagged with `:date` accept an absolute date in the layout `2006-01-02` and relative
+values which are resolved while parsing. Every value ends up as an absolute `2006-01-02`
+string in `Filter.Value`, so the SQL side never sees a relative value.
 
 ```go
     import (
         "fmt"
         "net/url"
-        validation "github.com/go-ozzo/ozzo-validation/v4"
     )
 
     func main() {
-        url, _ := url.Parse("http://localhost/?create_at[eq]=2020-10-02")
+        url, _ := url.Parse("http://localhost/?created_at[gte]=-90d")
         q, _ := rqp.NewParse(url.Query(), rqp.Validations{
-            "created_at": func(v interface{}) error {
-                s, ok := v.(string)
-                if !ok {
-                    return rqp.ErrBadFormat
-                }
-                return validation.Validate(s, validation.Date("2006-01-02"))
-            },
+            "created_at:date": nil,
         })
 
-        q.ReplaceNames(rqp.Replacer{"created_at": "DATE(created_at)"})
-
-        fmt.Println(q.SQL("table")) // SELECT * FROM table WHERE DATE(created_at) = ?
+        fmt.Println(q.SQL("table")) // SELECT * FROM table WHERE created_at >= ?
+        fmt.Println(q.Args())       // [2026-05-21]  (90 days before 2026-08-19)
     }
 ```
+
+### Relative values
+
+| Value | Meaning |
+| --- | --- |
+| `today`, `yesterday`, `tomorrow` | the respective day |
+| `-90d`, `-90day`, `-90days` | 90 days ago |
+| `-2w`, `-2week`, `-2weeks` | 2 weeks ago |
+| `-6m`, `-6month`, `-6months` | 6 months ago |
+| `-1y`, `-1year`, `-1years` | 1 year ago |
+| `30d`, `+30d` | 30 days ahead |
+
+Values are case insensitive. A leading `-` points into the past, a leading `+` or no sign at
+all points into the future — `+` decodes to a space in URLs and is trimmed, so `+30d` reaches
+the parser as `30d`.
+
+Relative values are resolved against the start of the current day in the location of
+`rqp.NowFunc`, which defaults to `time.Now` and can be replaced in tests:
+
+```go
+    rqp.NowFunc = func() time.Time {
+        return time.Date(2026, 8, 19, 0, 0, 0, 0, time.UTC)
+    }
+```
+
+Month and year arithmetic uses Go's `time.AddDate` normalization: one month before the 31st of
+March is the 3rd of March.
+
+`is` and `not` accept `null`, `empty` and `nullorempty` like string filters do.
