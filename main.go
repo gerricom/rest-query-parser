@@ -283,10 +283,14 @@ func (q *Query) AddORFilters(fn func(query *Query)) *Query {
 // AddFilterRaw adds a filter to Query as SQL condition.
 // This function supports only single condition per one call.
 // If you'd like add more then one conditions you should call this func several times.
-func (q *Query) AddFilterRaw(condition string) *Query {
+//
+// Optional args are appended to Query.Args() at the same position
+// where the raw condition is added.
+func (q *Query) AddFilterRaw(condition string, args ...any) *Query {
 	q.Filters = append(q.Filters, &Filter{
 		Name:   condition,
 		Method: raw,
+		Value:  args,
 	})
 	return q
 }
