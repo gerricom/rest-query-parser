@@ -7,7 +7,15 @@
 
 Query Parser is a library for easy building dynamic SQL queries to Database. It provides a simple API for web-applications which needs to do some filtering throught GET queries. It is a connector between the HTTP handler and the DB engine, and manages validations and translations for user inputs.
 
+## About this fork
 
+This is a fork of [timsolov/rest-query-parser](https://github.com/timsolov/rest-query-parser), which is no longer actively maintained. I currently maintain it as time permits. Pull requests are welcome!
+
+Notable changes compared to the original:
+
+- Module path is `github.com/gerricom/rest-query-parser`.
+- Requires Go 1.27 or newer.
+- Errors are wrapped with the standard library instead of `github.com/pkg/errors`. Use `errors.Is(err, rqp.ErrBadFormat)` instead of `errors.Cause(err) == rqp.ErrBadFormat`.
 
 ## Installation
     go get github.com/gerricom/rest-query-parser
