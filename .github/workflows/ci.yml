@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go fix (modernizers)
+        run: test -z "$(go fix -diff ./...)" || (go fix -diff ./... && exit 1)
+
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+
+      - name: misspell
+        run: go run github.com/client9/misspell/cmd/misspell@latest -error -locale US $(git ls-files '*.go')
+
+      - name: test
+        run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
