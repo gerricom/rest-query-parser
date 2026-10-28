@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	rqp "github.com/timsolov/rest-query-parser"
+	rqp "github.com/gerricom/rest-query-parser"
 )
 
 func main() {
