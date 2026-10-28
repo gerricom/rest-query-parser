@@ -19,21 +19,21 @@ func Test_in(t *testing.T) {
 		q, args, err := in("id IN (?)", []string{"1", "2"})
 		assert.NoError(t, err)
 		assert.Equal(t, "id IN (?, ?)", q)
-		assert.Equal(t, []interface{}{"1", "2"}, args)
+		assert.Equal(t, []any{"1", "2"}, args)
 	})
 
 	t.Run("Valuer", func(t *testing.T) {
 		q, args, err := in("id IN (?)", []sql.NullString{{String: "1", Valid: true}, {String: "2"}})
 		assert.NoError(t, err)
 		assert.Equal(t, "id IN (?, ?)", q)
-		assert.Equal(t, []interface{}{sql.NullString{String: "1", Valid: true}, sql.NullString{String: "2", Valid: false}}, args)
+		assert.Equal(t, []any{sql.NullString{String: "1", Valid: true}, sql.NullString{String: "2", Valid: false}}, args)
 	})
 
 	t.Run("MyValuer", func(t *testing.T) {
 		q, args, err := in("id IN (?)", MyValuer{})
 		assert.NoError(t, err)
 		assert.Equal(t, "id IN (?)", q)
-		assert.Equal(t, []interface{}{MyValuer{}}, args)
+		assert.Equal(t, []any{MyValuer{}}, args)
 	})
 
 	t.Run("More arguments", func(t *testing.T) {
@@ -59,7 +59,7 @@ func Test_in(t *testing.T) {
 	})
 
 	t.Run("Skip not slice", func(t *testing.T) {
-		_, _, err := in("id IN (?), id2 = ?", "1", []interface{}{"2"})
+		_, _, err := in("id IN (?), id2 = ?", "1", []any{"2"})
 		assert.NoError(t, err)
 	})
 }

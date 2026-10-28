@@ -14,12 +14,12 @@ import (
 // in expands slice values in args, returning the modified query string
 // and a new arg list that can be executed by a database. The `query` should
 // use the `?` bindVar.  The return value uses the `?` bindVar.
-func in(query string, args ...interface{}) (string, []interface{}, error) {
+func in(query string, args ...any) (string, []any, error) {
 	// argMeta stores reflect.Value and length for slices and
 	// the value itself for non-slice arguments
 	type argMeta struct {
 		v      reflect.Value
-		i      interface{}
+		i      any
 		length int
 	}
 
@@ -36,7 +36,7 @@ func in(query string, args ...interface{}) (string, []interface{}, error) {
 		t := deref(v.Type())
 
 		// []byte is a driver.Value type so it should not be expanded
-		if t.Kind() == reflect.Slice && t != reflect.TypeOf([]byte{}) {
+		if t.Kind() == reflect.Slice && t != reflect.TypeFor[[]byte]() {
 			meta[i].length = v.Len()
 			meta[i].v = v
 
@@ -58,7 +58,7 @@ func in(query string, args ...interface{}) (string, []interface{}, error) {
 		return query, args, nil
 	}
 
-	newArgs := make([]interface{}, 0, flatArgsCount)
+	newArgs := make([]any, 0, flatArgsCount)
 	buf := make([]byte, 0, len(query)+len(", ?")*flatArgsCount)
 
 	var arg, offset int
@@ -108,9 +108,9 @@ func in(query string, args ...interface{}) (string, []interface{}, error) {
 	return string(buf), newArgs, nil
 }
 
-func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interface{} {
+func appendReflectSlice(args []any, v reflect.Value, vlen int) []any {
 	switch val := v.Interface().(type) {
-	case []interface{}:
+	case []any:
 		args = append(args, val...)
 	case []int:
 		for i := range val {
@@ -121,7 +121,7 @@ func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interfa
 			args = append(args, val[i])
 		}
 	default:
-		for si := 0; si < vlen; si++ {
+		for si := range vlen {
 			args = append(args, v.Index(si).Interface())
 		}
 	}
@@ -131,7 +131,7 @@ func appendReflectSlice(args []interface{}, v reflect.Value, vlen int) []interfa
 
 // deref is Indirect for reflect.Types
 func deref(t reflect.Type) reflect.Type {
-	if t.Kind() == reflect.Ptr {
+	if t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
 	return t

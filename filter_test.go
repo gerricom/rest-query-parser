@@ -62,7 +62,7 @@ func Test_NullIntegerHandling(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{NULL}, args)
+		assert.Equal(t, []any{NULL}, args)
 	})
 
 	t.Run("Integer with NOT NULL method", func(t *testing.T) {
@@ -78,7 +78,7 @@ func Test_NullIntegerHandling(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{NULL}, args)
+		assert.Equal(t, []any{NULL}, args)
 	})
 
 	t.Run("Integer with IS method but non-NULL value should fail", func(t *testing.T) {
@@ -129,7 +129,7 @@ func Test_IntegerNullParsing(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{NULL}, args)
+		assert.Equal(t, []any{NULL}, args)
 	})
 
 	t.Run("Parse color_id[not]=NULL from URL", func(t *testing.T) {
@@ -146,7 +146,7 @@ func Test_IntegerNullParsing(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{NULL}, args)
+		assert.Equal(t, []any{NULL}, args)
 	})
 
 	t.Run("Parse color_id[eq]=123 still works", func(t *testing.T) {
@@ -163,7 +163,7 @@ func Test_IntegerNullParsing(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{123}, args)
+		assert.Equal(t, []any{123}, args)
 	})
 }
 
@@ -181,7 +181,7 @@ func Test_EmptyStringHandling(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{""}, args)
+		assert.Equal(t, []any{""}, args)
 	})
 
 	t.Run("Empty string with NE method", func(t *testing.T) {
@@ -197,7 +197,7 @@ func Test_EmptyStringHandling(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{""}, args)
+		assert.Equal(t, []any{""}, args)
 	})
 
 	t.Run("Empty string with LIKE method", func(t *testing.T) {
@@ -213,7 +213,7 @@ func Test_EmptyStringHandling(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{""}, args)
+		assert.Equal(t, []any{""}, args)
 	})
 
 	t.Run("Empty string with ILIKE method", func(t *testing.T) {
@@ -229,7 +229,7 @@ func Test_EmptyStringHandling(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{""}, args)
+		assert.Equal(t, []any{""}, args)
 	})
 
 	t.Run("Empty string with IN method", func(t *testing.T) {
@@ -245,7 +245,7 @@ func Test_EmptyStringHandling(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{"", "test", ""}, args)
+		assert.Equal(t, []any{"", "test", ""}, args)
 	})
 
 	t.Run("Empty string with NIN method", func(t *testing.T) {
@@ -261,7 +261,7 @@ func Test_EmptyStringHandling(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{"", "excluded"}, args)
+		assert.Equal(t, []any{"", "excluded"}, args)
 	})
 }
 

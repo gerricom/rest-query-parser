@@ -37,7 +37,7 @@ func main() {
 
 		"s":      rqp.In("one", "two"), // filter: s - string and equal
 		"id:int": nil,                  // filter: id is integer without additional validation
-		"i:int": func(value interface{}) error { // filter: custom func for validating
+		"i:int": func(value any) error { // filter: custom func for validating
 			if value.(int) > 1 && value.(int) < 10 {
 				return nil
 			}

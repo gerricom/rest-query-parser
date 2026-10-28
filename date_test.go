@@ -151,7 +151,7 @@ func Test_DateFilter(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{"2026-05-21"}, args)
+		assert.Equal(t, []any{"2026-05-21"}, args)
 	})
 
 	t.Run("absolute value is normalized", func(t *testing.T) {
@@ -171,7 +171,7 @@ func Test_DateFilter(t *testing.T) {
 
 		args, err := filter.Args()
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{"2026-08-19", "2026-08-18", "2020-10-02"}, args)
+		assert.Equal(t, []any{"2026-08-19", "2026-08-18", "2020-10-02"}, args)
 	})
 
 	t.Run("null and empty", func(t *testing.T) {
@@ -220,10 +220,10 @@ func Test_DateFilter(t *testing.T) {
 	})
 
 	t.Run("validation func receives resolved value", func(t *testing.T) {
-		var seen interface{}
+		var seen any
 
 		q, err := NewParse(url.Values{"created_at[gte]": []string{"-90d"}}, Validations{
-			"created_at:date": func(value interface{}) error {
+			"created_at:date": func(value any) error {
 				seen = value
 				return nil
 			},
@@ -231,7 +231,7 @@ func Test_DateFilter(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "2026-05-21", seen)
 		assert.Equal(t, " WHERE created_at >= ?", q.WHERE())
-		assert.Equal(t, []interface{}{"2026-05-21"}, q.Args())
+		assert.Equal(t, []any{"2026-05-21"}, q.Args())
 	})
 
 	t.Run("required tag", func(t *testing.T) {
@@ -244,6 +244,6 @@ func Test_DateFilter(t *testing.T) {
 			"created_at:date:required": nil,
 		})
 		assert.NoError(t, err)
-		assert.Equal(t, []interface{}{"2026-08-19"}, q.Args())
+		assert.Equal(t, []any{"2026-08-19"}, q.Args())
 	})
 }

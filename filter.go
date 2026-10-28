@@ -20,7 +20,7 @@ type Filter struct {
 	Key       string // key from URL (eg. "id[eq]")
 	Name      string // name of filter, takes from Key (eg. "id")
 	Method    Method // compare method, takes from Key (eg. EQ)
-	Value     interface{}
+	Value     any
 	ValueType string // type of Value, can be "int", "bool", "date" or "string"
 	OR        StateOR
 }
@@ -31,12 +31,7 @@ type Filter struct {
 func detectValidation(name string, validations Validations) (ValidationFunc, bool) {
 
 	for k, v := range validations {
-		if strings.Contains(k, ":") {
-			split := strings.Split(k, ":")
-			if split[0] == name {
-				return v, true
-			}
-		} else if k == name {
+		if n, _, _ := strings.Cut(k, ":"); n == name {
 			return v, true
 		}
 	}
@@ -48,20 +43,20 @@ func detectValidation(name string, validations Validations) (ValidationFunc, boo
 func detectType(name string, validations Validations) string {
 
 	for k := range validations {
-		if strings.Contains(k, ":") {
-			split := strings.Split(k, ":")
-			if split[0] == name {
-				switch split[1] {
-				case "int", "i":
-					return "int"
-				case "bool", "b":
-					return "bool"
-				case "date":
-					return "date"
-				default:
-					return "string"
-				}
-			}
+		n, tags, ok := strings.Cut(k, ":")
+		if !ok || n != name {
+			continue
+		}
+		typ, _, _ := strings.Cut(tags, ":")
+		switch typ {
+		case "int", "i":
+			return "int"
+		case "bool", "b":
+			return "bool"
+		case "date":
+			return "date"
+		default:
+			return "string"
 		}
 	}
 
@@ -113,18 +108,16 @@ func newFilter(rawKey string, value string, delimiter string, validations Valida
 
 func (f *Filter) validate(validate ValidationFunc) error {
 
-	switch f.Value.(type) {
+	switch value := f.Value.(type) {
 	case []int:
-		for _, v := range f.Value.([]int) {
-			err := validate(v)
-			if err != nil {
+		for _, v := range value {
+			if err := validate(v); err != nil {
 				return err
 			}
 		}
 	case []string:
-		for _, v := range f.Value.([]string) {
-			err := validate(v)
-			if err != nil {
+		for _, v := range value {
+			if err := validate(v); err != nil {
 				return err
 			}
 		}
@@ -160,7 +153,7 @@ func (f *Filter) parseKey(key string) error {
 			epos = spos + epos - 1
 
 			if epos-spos > 0 {
-				f.Method = Method(strings.ToUpper(string(key[spos:epos])))
+				f.Method = Method(strings.ToUpper(key[spos:epos]))
 				if _, ok := translateMethods[f.Method]; !ok {
 					return ErrUnknownMethod
 				}
@@ -263,9 +256,9 @@ func (f *Filter) Where() (string, error) {
 }
 
 // Args returns arguments slice depending on filter condition
-func (f *Filter) Args() ([]interface{}, error) {
+func (f *Filter) Args() ([]any, error) {
 
-	args := make([]interface{}, 0)
+	args := make([]any, 0)
 
 	switch f.Method {
 	case EQ, NE, GT, LT, GTE, LTE:
@@ -292,6 +285,16 @@ func (f *Filter) Args() ([]interface{}, error) {
 		args = append(args, params...)
 		return args, nil
 	case raw:
+		if f.Value == nil {
+			return args, nil
+		}
+
+		if rawArgs, ok := f.Value.([]any); ok {
+			args = append(args, rawArgs...)
+			return args, nil
+		}
+
+		args = append(args, f.Value)
 		return args, nil
 	default:
 		return nil, ErrUnknownMethod

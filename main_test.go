@@ -1,13 +1,13 @@
 package rqp
 
 import (
+	"errors"
 	"net/url"
 	"reflect"
 	"testing"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -93,7 +93,7 @@ func TestFields(t *testing.T) {
 				assert.Equal(t, c.expected, q.FieldsString())
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, c.err, errors.Cause(err))
+				assert.ErrorIs(t, err, c.err)
 			}
 		})
 	}
@@ -122,7 +122,7 @@ func TestOffset(t *testing.T) {
 			SetUrlQuery(URL.Query()).
 			AddValidation("offset", Max(10))
 		err = q.Parse()
-		assert.Equal(t, c.err, errors.Cause(err))
+		assert.ErrorIs(t, err, c.err)
 		assert.Equal(t, c.expected, q.OFFSET())
 	}
 }
@@ -151,7 +151,7 @@ func TestLimit(t *testing.T) {
 				SetUrlQuery(URL.Query()).
 				AddValidation("limit", Multi(Min(2), Max(10)))
 			err = q.Parse()
-			assert.Equal(t, c.err, errors.Cause(err))
+			assert.ErrorIs(t, err, c.err)
 			assert.Equal(t, c.expected, q.LIMIT())
 		})
 	}
@@ -282,7 +282,7 @@ func TestWhere(t *testing.T) {
 			assert.NoError(t, err)
 
 			q := NewQV(URL.Query(), Validations{
-				"id:int": func(value interface{}) error {
+				"id:int": func(value any) error {
 					if value.(int) > 10 {
 						return errors.New("can't be greater then 10")
 					}
@@ -294,7 +294,7 @@ func TestWhere(t *testing.T) {
 				),
 				"u:string": nil,
 				"b:bool":   nil,
-				"custom": func(value interface{}) error {
+				"custom": func(value any) error {
 					return nil
 				},
 			}).IgnoreUnknownFilters(c.ignore)
@@ -323,7 +323,7 @@ func TestWhere(t *testing.T) {
 func TestWhere2(t *testing.T) {
 
 	q := NewQV(nil, Validations{
-		"id:int": func(value interface{}) error {
+		"id:int": func(value any) error {
 			if value.(int) > 10 {
 				return errors.New("can't be greater then 10")
 			}
@@ -334,7 +334,7 @@ func TestWhere2(t *testing.T) {
 			"best",
 		),
 		"u:string": nil,
-		"custom": func(value interface{}) error {
+		"custom": func(value any) error {
 			return nil
 		},
 	})
@@ -437,9 +437,9 @@ func TestReplaceFiltersNames(t *testing.T) {
 	assert.False(t, q.HaveFilter("hello"))
 
 	assert.NoError(t, q.RemoveFilter("r.another"))
-	assert.Equal(t, q.RemoveFilter("r.another"), errors.Cause(ErrFilterNotFound))
+	assert.ErrorIs(t, q.RemoveFilter("r.another"), ErrFilterNotFound)
 	_, err = q.GetFilter("r.another")
-	assert.Equal(t, err, errors.Cause(ErrFilterNotFound))
+	assert.ErrorIs(t, err, ErrFilterNotFound)
 	f, _ := q.GetFilter("r.another")
 	assert.IsType(t, &Filter{}, f)
 }
@@ -491,14 +491,14 @@ func Test_ignoreUnknown(t *testing.T) {
 	assert.NoError(t, q.Parse())
 
 	q.IgnoreUnknownFilters(false)
-	assert.Equal(t, ErrFilterNotFound, errors.Cause(q.Parse()))
+	assert.ErrorIs(t, q.Parse(), ErrFilterNotFound)
 
 	q.SetUrlString("?id[gt]=10|id[lt]=10")
 	q.IgnoreUnknownFilters(true)
 	assert.NoError(t, q.Parse())
 
 	q.IgnoreUnknownFilters(false)
-	assert.Equal(t, ErrFilterNotFound, errors.Cause(q.Parse()))
+	assert.ErrorIs(t, q.Parse(), ErrFilterNotFound)
 
 }
 
@@ -549,7 +549,7 @@ func Test_Date(t *testing.T) {
 	q := New()
 
 	q.SetValidations(Validations{
-		"created_at": func(v interface{}) error {
+		"created_at": func(v any) error {
 			s, ok := v.(string)
 			if !ok {
 				return ErrBadFormat
@@ -599,6 +599,15 @@ func TestQuery_AddFilterRaw(t *testing.T) {
 	assert.Equal(t, "test = ? AND file_id != 'ec34d3b8-3013-43ee-ad7b-1d5d4a6d7213'", q.Where())
 }
 
+func TestQuery_AddFilterRaw_WithArgsOrder(t *testing.T) {
+	q := New().AddFilter("test", EQ, "ok")
+	q.AddFilterRaw("created_at > ?", "2026-10-28")
+	q.AddFilter("id", GT, 10)
+
+	assert.Equal(t, "test = ? AND created_at > ? AND id > ?", q.Where())
+	assert.Equal(t, []any{"ok", "2026-10-28", 10}, q.Args())
+}
+
 func TestEmptySliceFilterWithAnotherFilter(t *testing.T) {
 	q := New().AddFilter("id", IN, []string{})
 	q.AddFilter("another_id", EQ, uuid.New().String())
@@ -642,7 +651,7 @@ func ExampleQuery_AddORFilters() {
 func TestQuery_Clone(t *testing.T) {
 	q := New()
 	assert.NoError(t, q.SetUrlString("?offset=0&limit=10&fields=id&id=123"))
-	q.AddValidation("id", func(value interface{}) error {
+	q.AddValidation("id", func(value any) error {
 		return nil
 	})
 

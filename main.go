@@ -1,12 +1,13 @@
 package rqp
 
 import (
+	"errors"
 	"fmt"
+	"maps"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // Query the main struct of package
@@ -54,7 +55,7 @@ const NULL = "NULL"
 const EMPTY = "EMPTY"
 const NULLOREMPTY = "NULLOREMPTY"
 
-func IsNullOrEmpty(s interface{}) bool {
+func IsNullOrEmpty(s any) bool {
 	return s == NULL || s == EMPTY || s == NULLOREMPTY
 }
 
@@ -146,7 +147,7 @@ func (q *Query) SELECT() string {
 
 // HaveField returns true if request asks for specified field
 func (q *Query) HaveField(field string) bool {
-	return stringInSlice(field, q.Fields)
+	return slices.Contains(q.Fields, field)
 }
 
 // AddField adds field to SELECT statement
@@ -183,20 +184,17 @@ func (q *Query) Order() string {
 		return ""
 	}
 
-	var s string
+	parts := make([]string, 0, len(q.Sorts))
 
-	for i := 0; i < len(q.Sorts); i++ {
-		if i > 0 {
-			s += ", "
-		}
-		if q.Sorts[i].Desc {
-			s += fmt.Sprintf("%s DESC", q.Sorts[i].By)
+	for _, s := range q.Sorts {
+		if s.Desc {
+			parts = append(parts, s.By+" DESC")
 		} else {
-			s += q.Sorts[i].By
+			parts = append(parts, s.By)
 		}
 	}
 
-	return s
+	return strings.Join(parts, ", ")
 }
 
 // ORDER returns words ORDER BY with list of elements for sorting
@@ -244,7 +242,7 @@ func (q *Query) HaveFilter(name string) bool {
 }
 
 // AddFilter adds a filter to Query
-func (q *Query) AddFilter(name string, m Method, value interface{}) *Query {
+func (q *Query) AddFilter(name string, m Method, value any) *Query {
 	q.Filters = append(q.Filters, &Filter{
 		Name:   name,
 		Method: m,
@@ -267,7 +265,7 @@ func (q *Query) AddORFilters(fn func(query *Query)) *Query {
 	firstIdx := 0
 	lastIdx := len(_q.Filters) - 1
 
-	for i := 0; i < len(_q.Filters); i++ {
+	for i := range _q.Filters {
 		switch i {
 		case firstIdx:
 			_q.Filters[i].OR = StartOR
@@ -363,12 +361,9 @@ func (q *Query) RemoveValidation(NameAndOrTags string) error {
 			delete(q.validations, k)
 			return nil
 		}
-		if strings.Contains(k, ":") {
-			parts := strings.Split(k, ":")
-			if parts[0] == NameAndOrTags {
-				delete(q.validations, k)
-				return nil
-			}
+		if name, _, ok := strings.Cut(k, ":"); ok && name == NameAndOrTags {
+			delete(q.validations, k)
+			return nil
 		}
 	}
 	return ErrValidationNotFound
@@ -399,38 +394,18 @@ func (q *Query) Clone() *Query {
 
 	// copy query map
 	if q.query != nil {
-		qNew.query = make(map[string][]string)
-		for key := range q.query {
-			if len(q.query[key]) > 0 {
-				qNew.query[key] = make([]string, len(q.query[key]), cap(q.query[key]))
-				copy(qNew.query[key], q.query[key])
+		qNew.query = make(map[string][]string, len(q.query))
+		for key, values := range q.query {
+			if len(values) > 0 {
+				qNew.query[key] = slices.Clone(values)
 			}
 		}
 	}
 
-	// copy validations
-	if q.validations != nil {
-		qNew.validations = make(Validations)
-		for key := range q.validations {
-			qNew.validations[key] = q.validations[key]
-		}
-	}
-
-	// copy Fields
-	if q.Fields != nil {
-		qNew.Fields = make([]string, len(q.Fields), cap(q.Fields))
-		copy(qNew.Fields, q.Fields)
-	}
-	// copy Sorts
-	if q.Sorts != nil {
-		qNew.Sorts = make([]Sort, len(q.Sorts), cap(q.Sorts))
-		copy(qNew.Sorts, q.Sorts)
-	}
-	// copy Filters
-	if q.Filters != nil {
-		qNew.Filters = make([]*Filter, len(q.Filters), cap(q.Filters))
-		copy(qNew.Filters, q.Filters)
-	}
+	qNew.validations = maps.Clone(q.validations)
+	qNew.Fields = slices.Clone(q.Fields)
+	qNew.Sorts = slices.Clone(q.Sorts)
+	qNew.Filters = slices.Clone(q.Filters)
 
 	return qNew
 }
@@ -490,39 +465,36 @@ func (q *Query) Where() string {
 		return ""
 	}
 
-	var where string
-	// var OR bool = false
+	var where strings.Builder
 
-	for i := 0; i < len(q.Filters); i++ {
-		filter := q.Filters[i]
-
+	for i, filter := range q.Filters {
 		prefix := ""
 		suffix := ""
 
-		if filter.OR == StartOR {
+		switch {
+		case filter.OR == StartOR:
 			if i == 0 {
 				prefix = "("
 			} else {
 				prefix = " AND ("
 			}
-		} else if filter.OR == InOR {
+		case filter.OR == InOR:
 			prefix = " OR "
-		} else if filter.OR == EndOR {
+		case filter.OR == EndOR:
 			prefix = " OR "
 			suffix = ")"
-		} else if i > 0 && len(where) > 0 {
+		case i > 0 && where.Len() > 0:
 			prefix = " AND "
 		}
 
-		if a, err := filter.Where(); err == nil {
-			where += fmt.Sprintf("%s%s%s", prefix, a, suffix)
-		} else {
+		a, err := filter.Where()
+		if err != nil {
 			continue
 		}
-
+		where.WriteString(prefix + a + suffix)
 	}
 
-	return where
+	return where.String()
 }
 
 // WHERE returns list of filters for WHERE SQL statement with `WHERE` word
@@ -538,24 +510,21 @@ func (q *Query) WHERE() string {
 }
 
 // Args returns slice of arguments for WHERE statement
-func (q *Query) Args() []interface{} {
+func (q *Query) Args() []any {
 
-	args := make([]interface{}, 0)
+	args := make([]any, 0)
 
 	if len(q.Filters) == 0 {
 		return args
 	}
 
-	for i := 0; i < len(q.Filters); i++ {
-		filter := q.Filters[i]
+	for _, filter := range q.Filters {
 		if (filter.Method == IS || filter.Method == NOT) && IsNullOrEmpty(filter.Value) {
 			continue
 		}
 
 		if a, err := filter.Args(); err == nil {
 			args = append(args, a...)
-		} else {
-			continue
 		}
 	}
 
@@ -653,7 +622,7 @@ func (q *Query) Parse() (err error) {
 			delete(requiredNames, low)
 		default:
 			if len(values) == 0 {
-				return errors.Wrap(ErrBadFormat, key)
+				return wrap(ErrBadFormat, key)
 			}
 			for _, value := range values {
 				err = q.parseFilter(key, value)
@@ -664,7 +633,7 @@ func (q *Query) Parse() (err error) {
 		}
 
 		if err != nil {
-			return errors.Wrap(err, key)
+			return wrap(err, key)
 		}
 	}
 
@@ -672,7 +641,7 @@ func (q *Query) Parse() (err error) {
 
 	for requiredName := range requiredNames {
 		if !q.HaveFilter(requiredName) {
-			return errors.Wrap(ErrRequired, requiredName)
+			return wrap(ErrRequired, requiredName)
 		}
 	}
 
@@ -692,12 +661,7 @@ func (q *Query) requiredNames() map[string]bool {
 			// newname = arg1
 			// newname = arg2:int
 
-			if strings.Contains(newname, ":") {
-				parts := strings.Split(newname, ":")
-				name = parts[0]
-			} else {
-				name = newname
-			}
+			name, _, _ = strings.Cut(newname, ":")
 			// name = arg1
 			// name = arg2
 
@@ -725,7 +689,7 @@ func (q *Query) parseFilter(key, value string) error {
 	value = strings.TrimSpace(value)
 
 	if len(value) == 0 {
-		return errors.Wrap(ErrEmptyValue, key)
+		return wrap(ErrEmptyValue, key)
 	}
 
 	if strings.Contains(value, q.delimiterOR) { // OR multiple filter
@@ -734,7 +698,7 @@ func (q *Query) parseFilter(key, value string) error {
 			if i > 0 {
 				u := strings.Split(v, "=")
 				if len(u) < 2 {
-					return errors.Wrap(ErrBadFormat, key)
+					return wrap(ErrBadFormat, key)
 				}
 				key = u[0]
 				v = u[1]
@@ -742,20 +706,19 @@ func (q *Query) parseFilter(key, value string) error {
 
 			v := strings.TrimSpace(v)
 			if len(v) == 0 {
-				return errors.Wrap(ErrEmptyValue, key)
+				return wrap(ErrEmptyValue, key)
 			}
 
 			filter, err := newFilter(key, v, q.delimiterIN, q.validations)
 
 			if err != nil {
-				if err == ErrValidationNotFound {
+				if errors.Is(err, ErrValidationNotFound) {
 					if q.ignoreUnknown {
 						continue
-					} else {
-						return errors.Wrap(ErrFilterNotFound, key)
 					}
+					return wrap(ErrFilterNotFound, key)
 				}
-				return errors.Wrap(err, key)
+				return wrap(err, key)
 			}
 
 			// set OR
@@ -772,13 +735,13 @@ func (q *Query) parseFilter(key, value string) error {
 	} else { // Single filter
 		filter, err := newFilter(key, value, q.delimiterIN, q.validations)
 		if err != nil {
-			if err == ErrValidationNotFound {
+			if errors.Is(err, ErrValidationNotFound) {
 				err = ErrFilterNotFound
 				if q.ignoreUnknown {
 					return nil
 				}
 			}
-			return errors.Wrap(err, key)
+			return wrap(err, key)
 		}
 
 		q.Filters = append(q.Filters, filter)
@@ -789,12 +752,8 @@ func (q *Query) parseFilter(key, value string) error {
 
 // clean the filters slice
 func (q *Query) cleanFilters() {
-	if len(q.Filters) > 0 {
-		for i := range q.Filters {
-			q.Filters[i] = nil
-		}
-		q.Filters = nil
-	}
+	clear(q.Filters)
+	q.Filters = nil
 }
 
 func (q *Query) parseSort(value []string, validate ValidationFunc) error {
@@ -885,15 +844,13 @@ func (q *Query) parseOffset(value []string, validate ValidationFunc) error {
 		return ErrBadFormat
 	}
 
-	var err error
-
 	i, err := strconv.Atoi(value[0])
 	if err != nil {
 		return ErrBadFormat
 	}
 
 	if i < 0 {
-		return errors.Wrapf(ErrNotInScope, "%d", i)
+		return fmt.Errorf("%d: %w", i, ErrNotInScope)
 	}
 
 	if validate != nil {
@@ -917,15 +874,13 @@ func (q *Query) parseLimit(value []string, validate ValidationFunc) error {
 		return ErrBadFormat
 	}
 
-	var err error
-
 	i, err := strconv.Atoi(value[0])
 	if err != nil {
 		return ErrBadFormat
 	}
 
 	if i <= 0 {
-		return errors.Wrapf(ErrNotInScope, "%d", i)
+		return fmt.Errorf("%d: %w", i, ErrNotInScope)
 	}
 
 	if validate != nil {

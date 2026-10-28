@@ -11,7 +11,9 @@ Query Parser is a library for easy building dynamic SQL queries to Database. It 
 
 
 ## Installation
-    go get -u github.com/timsolov/rest-query-parser
+    go get github.com/timsolov/rest-query-parser
+
+Requires Go 1.27 or newer.
 
 ## Idea
 
@@ -41,7 +43,7 @@ See cmd/main.go and tests for more examples.
             "sort":           rqp.In("id", "name"), // sort could be or not in the query but if it is present it must be equal to "in" or "name"
             "s":      rqp.In("one", "two"), // filter: s - string and equal
             "id:int": nil,                  // filter: id is integer without additional validation
-            "i:int": func(value interface{}) error { // filter: custom func for validating
+            "i:int": func(value any) error { // filter: custom func for validating
                 if value.(int) > 1 && value.(int) < 10 {
                     return nil
                 }

@@ -1,5 +1,7 @@
 package rqp
 
+import "fmt"
+
 // Error special rqp.Error type
 type Error struct {
 	s string
@@ -12,6 +14,11 @@ func (e *Error) Error() string {
 // NewError constructor for internal errors
 func NewError(msg string) *Error {
 	return &Error{msg}
+}
+
+// wrap prefixes err with msg while keeping it matchable via errors.Is.
+func wrap(err error, msg string) error {
+	return fmt.Errorf("%s: %w", msg, err)
 }
 
 // Errors list:
